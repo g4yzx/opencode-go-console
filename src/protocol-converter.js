@@ -1,5 +1,15 @@
 'use strict';
 
+// OpenAI Chat Completions <-> Anthropic Messages translation.
+//
+// Anthropic-shaped models on the opencode Go gateway are served from
+// `{gateway}/anthropic/v1/messages` (x-api-key + anthropic-version) and answer
+// with `content` blocks plus typed SSE events. The bridge converts both ways:
+// `messages` <-> `system` + `messages`, `tool_calls` <-> `tool_use` /
+// `tool_result`, and `thinking` blocks, which surface as `reasoning_content`.
+// `reasoning_effort` becomes `thinking.budget_tokens`; when thinking is enabled
+// the custom sampling parameters are dropped, because Anthropic rejects them.
+
 const crypto = require('node:crypto');
 const { StringDecoder } = require('node:string_decoder');
 

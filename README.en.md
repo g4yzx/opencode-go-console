@@ -126,6 +126,24 @@ panel 127.0.0.1:8790 ── management and observability only: accounts, catalog
 The bridge has no UI and no database; all state lives in a handful of JSON / JSONL files and is
 restored after a restart.
 
+Only the files worth reading are listed; launchers (`start-*.bat`, `*.vbs`) are omitted:
+
+| File | Responsibility |
+|---|---|
+| `ui.js` | Panel backend: listens on 8790, serves the page and every `/api/*` route |
+| `ui/index.html` | Single-page frontend, no framework, CSS and JS inlined |
+| `src/bridge.js` | Bridge process: listens on 8788, protocol routing, account rotation, proxy routing, usage log |
+| `src/protocol-converter.js` | chat ⇄ Anthropic Messages |
+| `src/responses-converter.js` | chat ⇄ OpenAI Responses |
+| `src/google-converter.js` | chat ⇄ Gemini generateContent |
+| `src/usage.js` | Usage normalisation for all four protocols, plus SSE tail parsing |
+| `src/official-usage.js` | Console usage (`/console/api/usage/*`) |
+| `src/file-util.js` | Atomic writes, log rotation, tail-only reads |
+| `accounts.js` | Account pool: candidate keys, rotation, result marking |
+| `catalog.py` · `install-models.py` · `usage.py` | CLI: fetch catalog / write `models.json` / check quota |
+| `pack/launcher.c` · `pack/build.py` | Tray launcher and packaging script |
+| `test/` | `node --test` suites, 44 tests |
+
 ### Protocol mapping
 
 `provider.npm` (from models.dev) selects the converter:

@@ -1,5 +1,23 @@
 'use strict';
 
+/**
+ * opencode Go bridge — the relay WorkBuddy actually talks to.
+ *
+ * Listens on 127.0.0.1:8788 and pretends to be a plain OpenAI endpoint:
+ *
+ *   POST /v1/chat/completions   chat, streaming and non-streaming
+ *   GET  /v1/models             model list advertised to clients
+ *   GET  /health                liveness + config snapshot
+ *   POST /shutdown              stop (token-guarded; used by the panel)
+ *
+ * Per request it: resolves the model's wire protocol from models-catalog.json,
+ * translates chat ⇄ Anthropic / Responses / Google when needed, picks an account
+ * from the pool (rotating only before the first byte is written), routes through
+ * the proxy when the model or a previous 403 requires it, retries once without an
+ * unsupported parameter and remembers that per model, then appends one line to
+ * usage-history.jsonl. No database, no state beyond the JSON files next to it.
+ */
+
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');

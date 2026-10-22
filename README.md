@@ -92,6 +92,24 @@ WorkBuddy ──POST /v1/chat/completions──▶ 桥接 127.0.0.1:8788
 
 桥接本身无 UI、无数据库；状态全部落在几个 JSON / JSONL 文件里，进程重启即恢复。
 
+只列需要读懂的文件，`start-*.bat` / `*.vbs` 这类启动脚本不列：
+
+| 文件 | 干什么 |
+|---|---|
+| `ui.js` | 控制台后端：监听 8790，提供静态页与全部 `/api/*` |
+| `ui/index.html` | 单页前端，无框架，样式与脚本内嵌 |
+| `src/bridge.js` | 桥接主进程：监听 8788，协议路由、账号轮转、代理分流、用量落盘 |
+| `src/protocol-converter.js` | chat ⇄ Anthropic Messages |
+| `src/responses-converter.js` | chat ⇄ OpenAI Responses |
+| `src/google-converter.js` | chat ⇄ Gemini generateContent |
+| `src/usage.js` | 四种协议的 usage 归一化与 SSE 尾部解析 |
+| `src/official-usage.js` | 官网控制台用量（`/console/api/usage/*`） |
+| `src/file-util.js` | 原子写、日志轮转、只读文件尾部 |
+| `accounts.js` | 账号池：候选密钥、轮转、结果标记 |
+| `catalog.py` · `install-models.py` · `usage.py` | 命令行：拉目录 / 写 `models.json` / 查额度 |
+| `pack/launcher.c` · `pack/build.py` | 托盘启动器与打包脚本 |
+| `test/` | `node --test` 单测，44 项 |
+
 ### 协议映射
 
 `provider.npm`（来自 models.dev）决定用哪个转换器：
