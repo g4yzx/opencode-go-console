@@ -1,0 +1,27 @@
+# ---- 本机数据与凭据（绝不入库） ----
+accounts.json
+go_key.txt
+proxy.txt
+proxy-config.json
+bridge-config.json
+custom-models.json
+models-catalog.json
+usage-history.jsonl
+usage-history.jsonl.1
+.state/
+*.bak-*
+*.tmp-*
+
+# ---- 构建产物 ----
+dist/
+pack/build/
+node_modules/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.log
+*.suo
+Thumbs.db
+Desktop.ini
+.DS_Store

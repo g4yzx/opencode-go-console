@@ -1,0 +1,24 @@
+{
+  "name": "workbuddy-opencode-go-bridge",
+  "version": "1.0.1",
+  "description": "Local OpenCode Go compatibility bridge for WorkBuddy",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/bridge.js",
+    "check": "node --check src/bridge.js && node --check src/protocol-converter.js",
+    "test": "node --test test/*.test.js",
+    "audit": "node scripts/audit-public.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wuwu0605/workbuddy-opencode-go-bridge.git"
+  },
+  "homepage": "https://github.com/wuwu0605/workbuddy-opencode-go-bridge",
+  "bugs": {
+    "url": "https://github.com/wuwu0605/workbuddy-opencode-go-bridge/issues"
+  }
+}
