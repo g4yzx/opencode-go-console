@@ -1,6 +1,6 @@
 {
   "name": "workbuddy-opencode-go-bridge",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Local OpenCode Go compatibility bridge for WorkBuddy",
   "license": "MIT",
   "private": true,

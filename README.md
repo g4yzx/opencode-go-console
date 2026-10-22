@@ -1,411 +1,228 @@
-# opencode GO 控制台 · 桥接 + 托盘面板
+# opencode GO 控制台
 
 [![tests](https://github.com/g4yzx/opencode-go-console/actions/workflows/test.yml/badge.svg)](https://github.com/g4yzx/opencode-go-console/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-把 **opencode Go** 订阅接进 **WorkBuddy**：本地四协议桥接（chat / Responses / Anthropic / Google 互转）+ 可视化控制台 + 单文件 Windows 托盘版。
+**简体中文** · [English](README.en.md)
 
 - GitHub：<https://github.com/g4yzx/opencode-go-console>（[Releases](https://github.com/g4yzx/opencode-go-console/releases)）
 - Gitee：<https://gitee.com/g4yzx/opencode-go-console>（[发行版](https://gitee.com/g4yzx/opencode-go-console/releases)）
-- 协议：MIT（见 [LICENSE](LICENSE)）· 安全审计：[AUDIT.md](AUDIT.md) · 版本：v1.0.1
+- 协议 MIT（[LICENSE](LICENSE)）· 安全审计 [AUDIT.md](AUDIT.md) · 版本 v1.0.2
 
-> 为什么需要桥接：opencode Go 的网关强制要求 `x-opencode-session` 头，而 WorkBuddy 的自定义模型表单没有自定义 header 入口。本机起一个 127.0.0.1 的小服务做协议转换与鉴权补全，WorkBuddy 指向 `http://127.0.0.1:8788/v1` 即可。
+## 软件功能
 
-**桥接内核来源**：[wuwu0605/workbuddy-opencode-go-bridge](https://github.com/wuwu0605/workbuddy-opencode-go-bridge)（MIT，v1.0.0，源码方式运行，不装它的 exe）
-**模型/用量能力来源**：[Duskriver/dsh-opencode-go](https://github.com/Duskriver/dsh-opencode-go)（MIT，读了它的 catalog / usage / plan 实现）
+WorkBuddy 的自定义模型表单只认「标准 OpenAI 接口」，而 opencode Go 的网关有几道自己的规矩：要一个特殊请求头、不同模型走四种不同协议、部分模型还限制地区。这个项目在你自己电脑上（只监听 `127.0.0.1`）起一个中转站，把这些差异都挡在本地。
 
-## 图形面板（推荐日常用这个）
-
-双击 **`启动控制台.bat`**（或 `start-panel.bat`，同一份内容），浏览器会自动打开 `http://127.0.0.1:8790`。
-不想看到黑窗口就用 **`start-panel-silent.vbs`**。
-
-> 打不开怎么办：先在浏览器手动访问 `http://127.0.0.1:8790`。窗口里若显示 `[FAIL] Node.js 20+ not found`，
-> 说明 node 路径变了，编辑 bat 里的 `NODE=` 那一行。脚本会用 `%~dp0` 定位自身目录，
-> 不再写死绝对路径，也不再 `chcp 65001`（那会让 GBK 控制台把后续行解析错，报一堆
-> `'xxx' 不是内部或外部命令`）。
-
-| 区域 | 能做什么 |
+| 能力 | 说明 |
 |---|---|
-| 顶部状态条 | 桥接是否在跑、账号数、目录是否最新；右上「自动刷新」开关（每 10 秒刷状态与看板，不重载页面）；四色圆点切主题 |
-| **桥接进程（最上面）** | 整块边框就是状态灯：**运行中绿框 + 绿色徽标**，未运行红框 + 红色徽标。启停、打开 `/health`、**改端口** |
-| **代理** | 启用开关、代理地址、连接测试、地区限制自动回退；**按模型勾选是否走代理**（模型表「代理」列） |
-| 账号与用量 | 多账号增删改、上下排序、设为当前、逐个别查额度；当前账号三个窗口的百分比与重置时间 |
-| 用量看板 | 今天 / 7 / 30 / 90 天，按模型汇总请求数、输入输出 token、估算花费 |
-| 模型目录 | 搜索 / 按协议筛选 / 勾选；表格显示协议、上下文、输出上限、思考档位、图片、单价 |
-| 写入 | 一键合并进 `~/.workbuddy/models.json`，自动备份；四种协议都可以勾选 |
+| 鉴权 | WorkBuddy 不会发的 `x-opencode-session` 头，桥接按需生成并带上 |
+| 协议 | WorkBuddy 说 OpenAI 的话，桥接翻译成 Anthropic / Responses / Gemini 再发出去，回来再翻回来 |
+| 账号 | 额度用完自动换下一个号，已经输出一半的回答不会被重新发送 |
+| 代理 | 只让需要翻墙的模型走代理，其余照常直连 |
+| 用量 | 官网账单口径 + 本机统计口径，同屏对比 |
+| 装模型 | 目录里勾选，写进 WorkBuddy 的 `models.json`，写前自动备份 |
 
-面板只监听 `127.0.0.1:8790`，零 npm 依赖，和 CLI 脚本共用同一份 `models-catalog.json`、`accounts.json`。
+## 快速上手
 
-## 打包成单文件 EXE（托盘版）
+### 打开方式
 
-给不想装 Node、不想看黑窗口的人用。**一个 exe，双击就行**：首次解包 → 后台起服务 → 弹浏览器 → 缩进通知栏。
-
-```bat
-python pack\build.py                     :: 产物 dist\OpenCodeGoConsole.exe（约 32 MB）
-python pack\build.py --version 1.0.1     :: 换版本号，用户端会自动重解包
-```
-
-结构：Win32 启动器（`pack/launcher.c`，MinGW 编译）+ 内嵌 payload（node.exe + 应用代码，zlib 压缩后 32 MB）。
-
-| 行为 | 说明 |
-|---|---|
-| 首次运行 | 解包到 `%LOCALAPPDATA%\OpenCodeGo`（`app\` 代码 + `runtime\node.exe`），约 5–10 秒，托盘提示"首次初始化"；之后启动 < 2 秒，不再重解包 |
-| 弹页面 | 端口 8790 起来后才开浏览器，不会出现"无法连接" |
-| 托盘菜单 | 打开控制台 / 复制地址 / 重启服务 / 打开数据目录 / 开机自启 / 退出 |
-| 双击图标 | 直接打开页面 |
-| 退出 | 先调面板 `/api/shutdown`（桥接优雅停止），6 秒不退才强杀；Job 对象兜底，绝不留孤儿进程 |
-| 重复双击 | 不会开第二个托盘，只会把页面调出来 |
-| 绿色版 | exe 旁边放一个空的 `portable.txt`，数据就写在 exe 目录的 `app\` 里，不碰 `%LOCALAPPDATA%` |
-
-数据/日志都在 `%LOCALAPPDATA%\OpenCodeGo\app\`：`accounts.json`、`usage-history.jsonl`、`.state\diagnostic.log`、`models-catalog.json`。升级版本只覆盖代码文件（payload 里列出的那些），配置与历史原地保留。
-
-> 未签名的自解压 exe 首次运行会被 SmartScreen 拦一下（"更多信息 → 仍要运行"）。杀软误报时把 `%LOCALAPPDATA%\OpenCodeGo` 加白名单即可。
->
-> 托盘图标默认可能收进 `^` 溢出区：任务栏设置里把它拖出来，或打开"显示所有系统托盘图标"。
-
-### 改端口
-
-桥接框里的「端口」填 1024–65535，点「保存端口」：
-
-1. 写进 `bridge-config.json`（`{"bridgePort": 8788}`），桥接启动时读它；`start-bridge.bat` 不再写死端口
-2. 旧端口上正在跑的桥接会被**优雅关闭**（走 `/shutdown` token，失败才 kill pid）
-3. `models.json` 里本项目的行（名字以 ` (opencode Go)` 结尾）自动改成新地址，改前备份
-4. 不能和控制台端口相同；非法值直接拒绝
-
-改完点「启动桥接」即可。WorkBuddy 侧不用重新写入模型。
-
-## 代理（按模型）
-
-面板「代理」区块 + 模型表最右边的「代理」勾选框。设置存在 `proxy-config.json`：
-
-```json
-{
-  "enabled": true,
-  "url": "http://127.0.0.1:7897",
-  "fallback": true,
-  "models": ["gpt-6-luna", "gemini-4-argon-contributor"]
-}
-```
-
-路由规则：
-
-| 情况 | 走向 |
-|---|---|
-| 模型在 `models` 里 | **强制走代理**，直连一次都不试；代理挂了直接返回 `proxy_unavailable`，不会偷偷改回直连 |
-| 模型不在 `models` 里 | 直连 |
-| 直连被上游拒（`unsupported_country_region_territory`）且 `fallback: true` | 该**模型**自动改用代理并记住（只记这个模型，不影响别的模型） |
-| `enabled: false` | 完全不碰代理，`fallback` 也不生效 |
-
-- 桥接每 3 秒重读一次 `proxy-config.json`，面板改完**不用重启桥接**
-- 代理地址支持 `host:port`、`http://host:port`、`user:pass@host:port`
-- 面板「测试连接」= TCP 探测 + **出口查询**：透过代理问 `ip-api.com`，显示真实出口 IP / 国家。端口通 ≠ 出口在美国，这一步能直接看出代理规则有没有把 opencode.ai 放走代理
-- 兼容旧配置：没有 `proxy-config.json` 时读 `proxy.txt` 或 `OPENCODE_GO_PROXY`
-- `/health` 的 `proxy` 字段显示 `enabled / url / fallback / forced / autoPromoted`
-
-## 单模型探针
-
-模型表每行末尾有「测」按钮，走**和 WorkBuddy 完全相同的路径**发一个 16 token 的流式请求：
-
-```
-POST /api/test-model  {"id":"gpt-6-luna"}
-→ {"ok":true,"status":200,"ms":1544,"chunks":3}
-→ {"ok":false,"status":403,"ms":812,"error":"unsupported_country_region_territory"}
-```
-
-- 成功显示 `✓ 1.5s`，失败显示 `✗ 403` 并把上游错误原文写进日志面板
-- 403 = 地区限制（代理没生效/出口不是美国）；400 = 参数或模型 id 问题；超时 = 代理链路慢
-- 会消耗极少量额度（约 20 token）
-
-## 多账号
-
-桥接侧维护账号池（最多 20 个），WorkBuddy 里那条模型填**任意占位值**（例如 `opencode-go`），真实密钥在桥接里轮转。
-
-- 账号存在 `accounts.json`（明文，权限 0600，仅当前用户可读）
-- 顺序即优先级；「设为当前」把账号移到首位
-- **自动切换**：当前账号 401/403（凭据失效）或 402/429（额度耗尽）时，按顺序试下一个
-- 切换只在**还没输出任何内容**时发生 —— 已经吐了 token 就不重发，避免重复计费（语义同 dsh-opencode-go 的 `accountFallback`）
-- 上游返回 400 参数错误之类**不会**切号，直接透传，免得掩盖真实问题
-- 40x 的判定：`401/403 → credential`，`402/429 → quota`，`400/404` 且正文含 quota/credit/rate limit → quota
-
-已验证（假上游模拟）：主号 401 → 自动切备用号 → 200 返回 `served by keyB`，`activeRef` 自动改为备用号，主号标记 `lastError: credential`，`stats.accountSwitches: 1`。
-
-**添加账号和查额度是两件独立的事**：账号一按保存就落盘，额度查不到只记日志、只把卡片标成「额度未查询」，
-不会回滚账号、不会弹红条吓人。查不到的原文会带上上游响应，例如
-`密钥被拒绝（401）：{"type":"error","error":{"type":"AuthError","message":"Unauthorized"}}`。
-
-## 用量看板
-
-桥接每次请求往 `usage-history.jsonl` 追加一行：`{at, model, protocol, account, switched, stream, usage}`。
-
-`usage` 统一成 `{prompt, completion, cached, cacheWrite}`，来源是上游真实 usage，不再只统计非流式：
-
-| 协议 | 字段来源 | 处理 |
+| 方式 | 怎么做 | 适合谁 |
 |---|---|---|
-| chat（OpenAI 兼容） | `prompt_tokens` / `completion_tokens` / `prompt_tokens_details.cached_tokens` | 流式请求自动补 `stream_options.include_usage=true`，从末尾 usage 块读取 |
-| responses | `input_tokens` / `output_tokens` / `input_tokens_details.cached_tokens` | 流式从 `response.completed` 事件读取 |
-| anthropic | `input_tokens`（不含缓存）/ `cache_read_input_tokens` / `cache_creation_input_tokens` | 合计成总输入；流式合并 `message_start` 与 `message_delta` |
-| google | `promptTokenCount` / `candidatesTokenCount` + `thoughtsTokenCount` / `cachedContentTokenCount` | 思考 token 计入输出 |
+| 单文件 exe（推荐） | 双击 `OpenCodeGoConsole.exe`：首次解包 5–10 秒 → 自动开浏览器 → 缩进通知栏 | 电脑上没装 Node |
+| bat 脚本 | 双击 `start-panel.bat`；不想看黑窗口用 `start-panel-silent.vbs` | 已装 Node 20+ |
+| 命令行 | `node ui.js` | 调试源码 |
 
-- 花费按 models.dev 的 `cost.input` / `cost.output` / `cost.cache_read` / `cost.cache_write` 估算（缓存命中按缓存价，缓存写入按写入价），**不是账单**
-- 面板显示 usage 覆盖率；旧版本留下的记录没有 token 数，只计次数
-- 官方额度百分比始终以 `/usage` 接口为准
+### 第一次用，三步
 
-### 同步官网用量（官方口径）
+1. **填密钥**：「账号与用量」→ 添加账号，粘贴 opencode 的 key（`oc_sk_...`）。可以加多个，列表顺序就是优先级。
+2. **挑模型**：「模型目录」→「刷新目录」→ 勾想要的 → 「写入 WorkBuddy」。要全量就点表头全选。
+3. **启动桥接**：最上面那个桥接框点「启动桥接」，框变绿就通了。
 
-看板上方那组数字来自控制台真正在用的 JSON 接口，不是爬页面：
+然后回 WorkBuddy → 设置 → 模型：能看到名字带 `(opencode Go)` 的条目，地址是 `http://127.0.0.1:8788/v1`，点「测试连接」应当显示成功。
 
-```bash
-GET https://opencode.ai/console/api/usage/summary?since=<ISO>&range=7d
-GET https://opencode.ai/console/api/usage/models?since=<ISO>
-GET https://opencode.ai/console/api/usage/cost-by-day?since=<ISO>&bucket=day
-Authorization: Bearer oc_sk_...        # 个人密钥或服务账号密钥都行
-```
+### 每个模块是干什么的
 
-- 密钥需要在控制台有 **Usage: Read** 权限；默认的 Restricted 密钥如果没勾 Usage 会返回 403
-- `range=24h` 是「UTC 今天的 0 点起」，跟面板的「今天（滚动 24 小时）」不是一回事，所以请求里一律带显式 `since`，两边窗口才对得齐
-- 金额是 `totalCostMicroCents`，1e-8 美元为 1 单位，除以 1e8 就是美元
-- 面板每 5 分钟缓存一次；点「同步官网」强制刷新，失败会回落到 `.state/official-usage.json` 里的上次快照
-- 本地记录占官方的比例 = 走桥接的请求占比，剩下的是其它客户端（opencode CLI 等）；「token 覆盖」低是旧记录或中途取消的请求没拿到 usage 块，不是解析失败
+**桥接进程**
+真正干活的中转站。绿框 = 在跑，红框 = 没跑，点「启动桥接 / 停止」就行。这里还能改端口，改完 `models.json` 里本项目的模型地址会自动跟着改，不用手动修。桥接一停，WorkBuddy 里所有 opencode 模型立刻连不上，其它模型不受影响。
 
-## 三个脚本，对应三件事
+**代理**
+给「必须翻墙才能用」的模型准备的。打开开关、填代理地址（比如 `http://127.0.0.1:7897`），再去模型表最右边勾上要翻墙的那几个；没勾的一律直连，不会偷偷绕路。这里的「测试连接」不只测端口通不通，还会透过代理问一句「你从哪个国家出去」——端口通不等于出口在美国，这一步能直接看出代理规则有没有把 `opencode.ai` 放走。
 
-| 脚本 | 作用 |
+**账号与用量**
+一排钥匙。每个号可以单独查额度，三个窗口：5 小时、本周、本月，显示百分比和重置时间。号与号能调顺序、设当前。额度耗尽或 key 失效时桥接自动换下一个——只在还没开始输出的时候换，已经吐了一半的回答不会重来，免得重复计费。
+
+**用量看板**
+两本账上下对照。上半是官网控制台的数据（官方账单口径，含你在 opencode CLI 里的用量）；下半只算经过这个桥接的请求（本地口径）。两边对不上很正常：差额就是「没走桥接的部分」加上「旧记录没带 token 的部分」。每笔都按 models.dev 的单价估算金额，缓存命中按缓存价算，仅供参考，不是账单。
+
+**模型目录**
+一份菜单。列出网关现在有哪些模型、什么协议、上下文多大、单价多少。可以改上下文和输出上限（有些模型官方标得偏保守），也可以手动加目录里没有的模型。勾完点「写入 WorkBuddy」就装好，写之前自动备份；已经装过的行标「已装」，参数和目录对不上标「旧」，重新勾选写入就会更新。
+
+**顶栏小开关**
+右上「自动刷新」每 10 秒刷一次状态和看板，不重载页面；旁边四个圆点换主题；每个区块右上角的箭头能折叠，收起状态会被记住。
+
+### 常见毛病，对照着看
+
+| 现象 | 多半是 |
 |---|---|
-| `ui.js` + `ui/index.html` | 图形控制台（8790 端口），账号 / 看板 / 目录 / 写入 / 桥接启停 |
-| `accounts.js` | 账号池读写，被桥接和面板共用 |
-| `catalog.py` | **自动获取可用模型 + 每个模型的配置**：拉网关目录 + models.dev 元数据，合并成 `models-catalog.json` |
-| `install-models.py` | 按 catalog 生成 WorkBuddy 的 `models.json` 条目（context / 输出上限 / 图片 / 协议全自动） |
-| `usage.py` | **查订阅用量**：5 小时 / 每周 / 每月已用百分比 + 重置时间 |
+| WorkBuddy 里「测试连接」失败 | 桥接没启动（框是红的），或者模型 id 写错 |
+| 403 / `unsupported_country_region_territory` | 这个模型要美区出口，勾上代理再测一次 |
+| 401 | key 无效或没权限，重新贴一次 |
+| 429 | 这个号的额度用完了，加个号或等重置 |
+| 面板能开、模型调不通 | 点模型行末尾的「测」：它走的是和 WorkBuddy 完全相同的路径，报什么错一眼就知道 |
+| 托盘图标找不到 | 被收进 `^` 溢出区了，拖出来一次就好 |
 
-```bash
-python catalog.py                 # 看现在有什么模型、什么配置
-python catalog.py --refresh       # 强制刷新（缓存 6 小时）
-python install-models.py          # 干跑
-python install-models.py --apply  # 写入 ~/.workbuddy/models.json（自动备份）
-python usage.py                   # 查额度
-python usage.py --watch 60        # 每分钟刷新
+## 专业说明
+
+<details>
+<summary><b>展开：架构、协议映射、接口清单、参数策略、打包链路、测试</b></summary>
+
+### 架构与数据流
+
+```
+WorkBuddy ──POST /v1/chat/completions──▶ 桥接 127.0.0.1:8788
+                                          │ 1. 读 models-catalog.json 判定协议
+                                          │ 2. chat → 目标协议转换（含 SSE 增量）
+                                          │ 3. 选账号（轮转 / 直连或走代理）
+                                          ▼
+                                   opencode 网关 /inference/go/*
+                                          │
+                                          ▼ 响应再转回 chat.completion(.chunk)
+面板 127.0.0.1:8790 ── 只做管理与观测：账号、目录、用量、桥接启停、写 models.json
 ```
 
-## 端点（2026-10-21 实测）
+桥接本身无 UI、无数据库；状态全部落在几个 JSON / JSONL 文件里，进程重启即恢复。
+
+### 协议映射
+
+`provider.npm`（来自 models.dev）决定用哪个转换器：
+
+| npm | 协议 | 上游路径 | 转换模块 |
+|---|---|---|---|
+| `@ai-sdk/openai-compatible` | `chat` | `/inference/go/openai/v1/chat/completions` | 直通（只补头） |
+| `@ai-sdk/openai` | `responses` | `/inference/go/openai/v1/responses` | `src/responses-converter.js` |
+| `@ai-sdk/anthropic` | `anthropic` | `/inference/go/anthropic/v1/messages` | `src/protocol-converter.js` |
+| `@ai-sdk/google` | `google` | `/inference/go/google/v1beta/models/{id}:generateContent` | `src/google-converter.js` |
+
+请求侧把 `messages` 拆成各家结构（Responses 的 `instructions` + `input`、Anthropic 的 `system` + `messages`、Google 的 `contents` + `parts`），响应侧把上游事件合回 `chat.completion.chunk`，含 tool call 增量与 `thinking → reasoning_content`。未知模型返回 `protocol_not_bridgeable`，不会硬猜。
+
+### 接口清单（2026-10-21 实测）
 
 | 用途 | 端点 | 鉴权 | 需要 session 头 |
 |---|---|---|---|
 | 模型目录 | `GET https://opencode.ai/inference/go/v1/models` | 无 | ❌ |
 | OpenAI chat 推理 | `POST .../inference/go/openai/v1/chat/completions` | Bearer | ✅ |
-| Anthropic Messages 推理 | `POST .../inference/go/anthropic/v1/messages` | x-api-key | ✅ |
-| **用量** | `GET .../inference/go/v1/usage` | Bearer | ❌ |
-| 官网用量（汇总） | `GET https://opencode.ai/console/api/usage/summary?since=…` | Bearer | ❌ |
-| 官网用量（按模型 / 按天） | `GET .../console/api/usage/models`、`/usage/cost-by-day` | Bearer | ❌ |
+| OpenAI responses 推理 | `POST .../inference/go/openai/v1/responses` | Bearer | ✅ |
+| Anthropic Messages | `POST .../inference/go/anthropic/v1/messages` | x-api-key | ✅ |
+| Google generateContent | `POST .../inference/go/google/v1beta/models/{id}:generateContent` | Bearer | ✅ |
+| 订阅额度 | `GET .../inference/go/v1/usage` | Bearer | ❌ |
+| 官网用量 | `GET https://opencode.ai/console/api/usage/{summary,models,cost-by-day}?since=…` | Bearer | ❌ |
 | 模型元数据 | `GET https://models.dev/api.json` → `["opencode-go"]` | 无 | ❌ |
 
-- 旧的 `/zen/go/v1/*` 仍可用（兼容保留），新端点已切到 `/inference/go/*`
-- 用量响应：`{usage:{rolling,weekly,monthly}}`，每项 `{status:"ok"|"rate-limited", percent:0-100, resetsAt:ISO}`
-- 模型元数据字段：`limit.context` / `limit.output` / `modalities.input` / `reasoning` / `cost` / `provider.npm`（决定协议）
+- 旧的 `/zen/go/v1/*` 仍可用（兼容保留），新代码一律走 `/inference/go/*`
+- 额度响应：`{usage:{rolling,weekly,monthly}}`，每项 `{status,percent,resetsAt}`
+- 控制台金额单位是 `totalCostMicroCents`，除以 `1e8` 得美元；`range=24h` 只到 UTC 零点，所以请求里一律带显式 `since`
 
-## catalog.py 输出的现状（2026-10-21）
+### 账号轮转语义
 
-网关 37 个模型，WorkBuddy 可用 **30** 个：
+- 池子上限 20，明文存 `accounts.json`（0600，仅当前用户可读）；WorkBuddy 侧随便填个占位 key
+- 触发切换：`401/403`（凭据失效）、`402/429`（额度耗尽）
+- **只在尚未向客户端输出任何字节时切换**；已开始流式响应则原样透传，避免重复计费与半截回答
+- `400/404` 等参数错误不切号，直接透传上游原文，避免掩盖真实问题
+- 面板的「添加账号」与「查额度」是两条独立链路：查额度失败只记日志与 `lastError`，不回滚账号
 
-| 协议 | 数量 | 说明 |
+### usage 归一化与计费
+
+每条请求往 `usage-history.jsonl` 追加一行 `{at, model, protocol, account, switched, stream, usage}`，`usage` 统一为 `{prompt, completion, cached, cacheWrite}`：
+
+| 协议 | 原始字段 | 处理 |
 |---|---|---|
-| `chat`（OpenAI 兼容） | 18 | glm-5.2/5.3/5.3-flash、kimi-k2.7-code、kimi-k3、deepseek-v4-pro/v4.1-flash、mimo 四款、longcat、hy3/hy4、step-5、beam-free、minimax-m3.1-flash-free |
-| `anthropic`（桥接转换） | 6 | qwen3.8-max/flash、qwen3.7-plus、minimax-m3/m2.7、claude-haiku-5-5 |
-| `responses`（桥接转换） | 5 | **gpt-6-luna、gpt-5.6-luna**、grok-4.7、muse-spark 1.2/1.3 |
-| `google`（桥接转换） | 1 | gemini-4-argon-contributor |
-| 无元数据 | 7 | glm-5.1、grok-4.6、kimi-k2.6、minimax-m2.5、omen-alpha、qwen3.6-plus、qwen3.7-max |
+| chat | `prompt_tokens` / `completion_tokens` / `prompt_tokens_details.cached_tokens` | 流式注入 `stream_options.include_usage=true`，从尾部 usage 块取 |
+| responses | `input_tokens` / `output_tokens` / `input_tokens_details.cached_tokens` | 从 `response.completed` 事件取 |
+| anthropic | `input_tokens`（不含缓存）+ `cache_read_input_tokens` + `cache_creation_input_tokens` | 合计为总输入；流式合并 `message_start` 与 `message_delta` |
+| google | `promptTokenCount` / `candidatesTokenCount` + `thoughtsTokenCount` / `cachedContentTokenCount` | 思考 token 计入输出 |
 
-`responses` 由 `src/responses-converter.js` 做双向转换：请求侧把 `messages` 拆成 `instructions` + `input` 条目
-（含 `function_call` / `function_call_output`），响应侧把 `output` 条目和 13 种 SSE 事件合回 `chat.completion.chunk`。
-只有 `google` 的 `generateContent` 协议由 `src/google-converter.js` 翻译：`contents` / `parts` / `functionCall` 与
-`candidates[].content.parts` 双向映射，JSON Schema 会裁到 Google 支持的字段，schema 之外的字段直接丢弃。
+计费按 models.dev 的 `cost.input/output/cache_read/cache_write`，未命中的 token 按输入价、命中按缓存价、写入按写入价。日志 8 MB 轮转，诊断日志 1 MB 轮转，看板只读尾部 16 MB。
 
-## 思考等级（低 / 中 / 高 / 极）自动识别
+### 参数降级与两个硬门槛
 
-来源是 models.dev 每个模型的 `reasoning_options`，不是猜的：
+- 上游报 `Unsupported parameter: 'xxx'` → 剥掉该字段重试一次，并按模型记住，后续不再携带（`top_p` 在 Google 协议里同时匹配 `topP`）
+- 直连报 `unsupported_country_region_territory` → 该模型自动改走代理并记忆，**不读宿主 `HTTPS_PROXY`**（避免静默继承环境代理）
+- Responses 协议的 `max_output_tokens` 下限是 16：WorkBuddy 的「测试连接」只申请 1 token，转换时统一抬到 16
+- `reasoning_effort: minimal` 在 Responses 不合法，折成 `low`
 
-| models.dev 声明 | 写入 WorkBuddy |
-|---|---|
-| `{"type":"effort","values":["low","medium","high"]}` | `supportedEfforts: ["low","medium","high"]` |
-| 值里含 `none` / `off`，或 `{"type":"toggle"}` | `canDisableThinking: true` |
-| `{"type":"budget_tokens","max":262144}` | 记录 `thinkingBudgetMax`（面板可见，暂不下发） |
-| `reasoning: true` 但没有任何选项 | 只置 `supportsReasoning: true`，不虚构等级 |
+思考等级按 models.dev 的 `reasoning_options` 解析成 `supportedEfforts` / `canDisableThinking`，请求侧再按协议落位：`chat` 原样透传、`responses` → `reasoning.effort`、`anthropic` → `thinking.budget_tokens`（2048/4096/8192/12288/15360）、`google` → `thinkingConfig.thinkingLevel`。
 
-写进 `models.json` 的样子：
+### 目录与 models.json
 
-```json
-"reasoning": {
-  "defaultEffort": "medium",
-  "supportedEfforts": ["low", "medium", "high", "xhigh", "max"],
-  "canDisableThinking": true
-}
-```
-
-默认等级优先取 `medium`，没有就 `high`，再没有取第一项。表里的 `xhigh` 在面板显示为「极高」，`max` 显示为「极」。
-
-请求侧按协议翻译 `reasoning_effort`：
-
-| 协议 | 落点 |
-|---|---|
-| `chat` | 原样透传 `reasoning_effort`（上游不认时会自动剥离重试） |
-| `responses` | `reasoning: { effort }` |
-| `anthropic` | `thinking: { type: 'enabled', budget_tokens }`（low 2048 / medium 4096 / high 8192 / xhigh 12288 / max 15360），并抬高 `max_tokens`、去掉采样参数 |
-| `google` | `generationConfig.thinkingConfig.thinkingLevel`（low/medium/high）；`none` → `thinkingBudget: 0` |
-
-`install-models.py --existing` 只刷新已经装过的行，不会往 `models.json` 里塞新模型。
-
-## 与 WorkBuddy 同步
-
-「模型目录」会顺带读 `~/.workbuddy/models.json`，把 WorkBuddy 里**已经装好的条目**标出来：
-
-| 列 / 位置 | 含义 |
-|---|---|
-| WB 列 `已装` | 已写入 WorkBuddy，且端口 / 上下文 / 输出上限 / 图片与目录一致 |
-| WB 列 `旧` | 已装，但参数和目录对不上（悬停看差在哪几项），重新勾选写入即可更新 |
-| WB 列 `-` | WorkBuddy 里没有这个模型 |
-| 顶部统计 | `· WorkBuddy 已装 11（2 个参数过期）` |
-| 「读取 WorkBuddy」按钮 | 重新读一次 models.json，只读不写 |
-| 过滤「已装」 | 只看 WorkBuddy 里已有的模型 |
-
-判定范围：`name` 以 ` (opencode Go)` 结尾，或 `url` 指向 `http://127.0.0.1:<port>/v1` —— 你自己加的其他自定义模型不会被误判。
-已装但网关上已经没有的模型会记在 `workbuddy.orphans`，用「清理旧条目」写入时清掉。
-
-## 手动修改与新增模型
-
-面板表格每行右侧有「编辑」，弹窗里可以改：显示名、协议、**上下文**、**输出上限**、图片、思考档位。
-保存后写进 `custom-models.json` 的 `overrides`，刷新目录不会丢，行上会标「已改」；点「恢复默认」撤销。
-
-工具栏的「手动新增模型」用于网关目录里没有的模型：填 id、协议、上下文、输出、思考档位即可。
-保存后立刻出现在目录里并标「手动」，可以勾选后写入 WorkBuddy；只有手动模型才有「删除」按钮。
+`models-catalog.json`（缓存 6 小时）由网关注目录与 models.dev 元数据合并而来，字段含 `protocol/context/output/images/costIn/costOut/reasoningEfforts`。写入 `~/.workbuddy/models.json` 的条目形如：
 
 ```json
 {
-  "overrides": { "gpt-6-luna": { "context": 1050000, "output": 128000 } },
-  "custom": [{ "id": "my-model", "protocol": "chat", "context": 128000, "output": 8192 }]
+  "id": "gpt-6-luna",
+  "name": "GPT-6 Luna (opencode Go)",
+  "url": "http://127.0.0.1:8788/v1",
+  "supportsToolCall": true,
+  "supportsImages": false,
+  "supportsReasoning": true,
+  "maxInputTokens": 1050000,
+  "maxOutputTokens": 32768,
+  "reasoning": { "defaultEffort": "medium", "supportedEfforts": ["low","medium","high"], "canDisableThinking": true }
 }
 ```
 
-写入 `models.json` 时用的就是覆盖后的值；手动/覆盖行的输出上限最高 1,000,000，
-目录自动值仍按 65,536 保守截断。`install-models.py` 也读同一份 `custom-models.json`，命令行和面板不会打架。
+手动覆盖与自建模型存 `custom-models.json`（`overrides` / `custom`），面板与 CLI 共用；目录自动值的输出上限按 65,536 截断，手工行放宽到 1,000,000。
 
-## 地区限制与本地代理
+### 面板 API
 
-
-
-GPT 系列（`gpt-6-luna` / `gpt-5.6-luna`）会在上游返回：
-
-```
-403 unsupported_country_region_territory  Country, region, or territory not supported
-```
-
-这不是协议或密钥问题——同样的请求经本地代理出口就是 200。桥接因此做了自动回退：
-
-1. 先直连，命中 `unsupported_country_region_territory` 才走代理重试；
-2. 代理生效后本进程后续请求直接走代理，不再浪费一次直连；
-3. 代理地址写在 `proxy.txt`，一行即可（默认 `http://127.0.0.1:7897`），改端口不用动代码；
-4. 代理挂了不会掩盖真实错误，仍返回上游原文。
-
-`/health` 里的 `geoProxy` 显示当前生效的代理。**刻意不读 `HTTPS_PROXY`**：宿主环境常有自己的一套代理变量，静默继承会把流量带去用户没选的出口。
-
-## 推理模型的参数降级
-
-`gpt-6-luna` 这类模型会拒绝采样参数：
-
-```
-400 Unsupported parameter: 'temperature' is not supported with this model.
-```
-
-桥接遇到 `Unsupported parameter: 'xxx'` 会剥掉该字段重试一次，并把结果按模型记住（`temperature` / `top_p` 等），
-后续请求直接不带，不会每次都多花一轮。`top_p` 在 Google 协议里会同时匹配 `topP`。
-
-### Responses 的两个硬门槛（GPT 系）
-
-| 坑 | 上游原文 | 处理 |
+| 方法 | 路径 | 作用 |
 |---|---|---|
-| `max_tokens` 太小 | `Invalid 'max_output_tokens': integer below minimum value. Expected >= 16, but got 1` | 转换时抬到 **16**（WorkBuddy 的「测试连接」只申请 1 token，之前 GPT 红、Gemini 绿就是这条） |
-| `reasoning_effort: minimal` | `Unsupported value: 'minimal' is not supported with the 'gpt-6-luna' model` | 折成 `low`（Responses 只认 none/low/medium/high/xhigh/max） |
+| GET | `/api/status` | 桥接、密钥、目录、代理、账号摘要 |
+| GET | `/api/catalog` | 模型目录（`?refresh=1` 强刷） |
+| GET | `/api/usage` | 订阅额度（可选 `?ref=` 指定账号） |
+| GET | `/api/official/usage` | 官网用量（`?days=1\|7\|30\|90`） |
+| POST | `/api/test-model` | 单模型探针，走与 WorkBuddy 相同路径 |
+| POST | `/api/install` | 写入 WorkBuddy `models.json`（自动备份） |
+| POST | `/api/models` | 改/增/删模型覆盖 |
+| POST | `/api/accounts` | 账号增删改、排序、切当前 |
+| POST | `/api/proxy` | 代理读写与出口探测 |
+| POST | `/api/config` | 改桥接端口（联动改 `models.json`） |
+| POST | `/api/bridge` | 启动 / 停止桥接 |
+| POST | `/api/shutdown` | 停桥接并退出控制台（托盘用） |
 
-这两条只影响走 Responses 协议的模型；chat / anthropic / google 没有 16 的下限。
+非 GET 请求强制 `application/json` 且校验 `Origin`，跨站页面无法改代理或停服务。
 
-## 对上游代码的改动
+### 打包与进程生命周期
 
+`pack/launcher.c`（Win32，MinGW 编译）+ `pack/build.py`：应用代码与 `node.exe` 打成 OCA1 归档、zlib 压缩，作为 RCDATA 贴在 exe 里。
 
-### 来自 DSH 插件的三个认知（不是抄代码，是按它的规范实现）
+- 首次运行解到 `%LOCALAPPDATA%\OpenCodeGo`，版本号写 `app\.version`；版本没变就不再重解，数据文件不在 payload 里所以原地保留
+- 读到 `portable.txt` 则改用 exe 同目录（绿色模式）
+- 子进程入 Job 对象（`KILL_ON_JOB_CLOSE`）：启动器无论如何退出，node 与桥接都被清理
+- 托盘「退出」先调 `/api/shutdown` 让桥接优雅停止，6 秒不退才 `TerminateProcess`
+- 重复双击不会开第二个托盘，只把现有页面调出来
 
-1. 网关已从 `/zen/go/v1` 迁到 `/inference/go`，推理按协议分家（openai / anthropic / google 各自 `v1`）
-2. **模型配置的权威来源是 models.dev 的 `opencode-go` 段**，其中 `provider.npm` 决定协议：
-   `@ai-sdk/anthropic`→anthropic、`@ai-sdk/openai`→responses、`@ai-sdk/openai-compatible`→chat、`@ai-sdk/google`→google
-3. 用量在 `{gateway}/v1/usage`，返回三个窗口的百分比，不是金额
+### 测试与审计
 
-### bridge.js（6 处）
+```bash
+npm test                                   # 44 项，node --test，零依赖
+node --check ui.js && node --check src/bridge.js
+python pack\build.py --version x.y.z       # 出包，产物 dist\OpenCodeGoConsole.exe
+```
 
-1. 端口 `9221 → 8788`
-2. 上游路径切新网关：chat → `/inference/go/openai/v1/chat/completions`，messages → `/inference/go/anthropic/v1/messages`
-3. **白名单改为 catalog 驱动**：读 `models-catalog.json` 决定每个模型的协议；内置集合只做无 catalog 时的兜底
-4. `responses` / `google` 都走转换；只有未知模型才返回 `protocol_not_bridgeable`
-5. key 兜底：客户端没带鉴权头时回退 `GO_KEY`
-6. `/health` 增加 `catalogLoaded`，`/v1/models` 改为 catalog ∪ 内置
-7. 新增 `responses-converter.js`：chat ↔ Responses 双向转换（含 SSE 增量、tool call、usage）
+CI 在 GitHub Actions 上跑 Node 20 / 22 双矩阵。安全审计（CSRF、孤儿进程、端口占用、原子写、日志轮转）见 [AUDIT.md](AUDIT.md)，含每条结论的验证命令。
 
-### protocol-converter.js（1 处）
+</details>
 
-`MESSAGES_MODELS` 换成真实协议归属：移除 `minimax-m3.1-flash-free`（实际是 chat），补 `claude-haiku-5-5`。
+## 参考的项目
 
-### 测试
-
-原版 6 个测试全部保留并通过；只同步了 3 处上游路径断言（`/zen/go/v1/*` → `/inference/go/*`）。
-新增 `test/responses-converter.test.js` 7 项（请求转换、非流式、流式、tool call、错误包装），
-集成测试补了 GPT 非流式 + 流式两条链路。
-
-## 本机实测（2026-10-21）
-
-| 用例 | 结果 |
+| 项目 | 参考了什么 |
 |---|---|
-| `node --test` 6 项 | ✅ 全绿 |
-| `catalog.py` | ✅ 网关 37 / 可用 30，含 context、output、图片、成本 |
-| `install-models.py` 干跑 | ✅ 生成 24 条，`maxOut` 统一 cap 到 65536 |
-| `/health` | ✅ `catalogLoaded: true` |
-| `glm-5.3`（chat） | ✅ 走 openai 新路径 → 401 `Invalid credential` |
-| `minimax-m3.1-flash-free` | ✅ 按 catalog 判为 chat（内置表曾错判为 anthropic，已修） |
-| `qwen3.8-max` / `claude-haiku-5-5`（anthropic） | ✅ 走 messages 转换 → 401，错误已转 OpenAI 格式 |
-| `grok-4.7` / `gpt-6-luna` | ✅ 走 responses 转换（真 key 下 200） |
-| `gemini-4-argon-contributor` | ✅ 走 google 转换（上游要求先开 Privacy 开关） |
-| 不存在的模型 | ✅ 400 `unsupported_model` |
-| `usage.py` 无 key / 假 key | ✅ 本地报错 / 401 明确提示 |
-| 真 key 下的 200 / 流式 / tool call / 用量数值 | ⏳ 待你的 key |
+| [wuwu0605/workbuddy-opencode-go-bridge](https://github.com/wuwu0605/workbuddy-opencode-go-bridge)（MIT） | 桥接的起点：请求转发与协议路由的组织方式、账号池、流式转发的收尾处理 |
+| [Duskriver/dsh-opencode-go](https://github.com/Duskriver/dsh-opencode-go)（MIT） | 网关迁移后的接口约定：以 models.dev 作模型元数据源、`/v1/usage` 查额度、控制台用量的统计口径 |
+| [models.dev](https://models.dev/api.json) | 模型元数据：上下文与输出上限、单价、思考档位、`provider.npm` 与协议的对应关系 |
 
-## 安全审计
+上游的 MIT 版权声明保留在 [LICENSE](LICENSE)。
 
-完整报告见 **[AUDIT.md](AUDIT.md)**（含验证命令与实测结果）。
+## 许可证
 
-- 上游硬编码 `https://opencode.ai`，零 npm 依赖，不读 key 文件，不记 prompt / 响应 / 鉴权头
-- `usage.py` / `catalog.py` 只访问 `opencode.ai` 和 `models.dev`，key 只在内存里拼 header
-- 面板只绑 `127.0.0.1`；非 GET 请求强制 `application/json` 且校验 `Origin`，挡住任意网页对本地端口的跨站写（改代理、停服务）
-- 配置与 `models.json` 一律"临时文件 + rename"原子写；`usage-history.jsonl` 8 MB、`diagnostic.log` 1 MB 自动轮转
-- `POST /api/shutdown`（退出）、`SIGINT/SIGTERM` 都会先停桥接再退；打包版的 node 进程放在 Job 对象里，启动器退出即连带清理
-- 明文密钥是已知取舍：文件仅当前用户可读，面板只回传尾 4 位
-
-> 用 curl 手工调接口要带上 `-H "Content-Type: application/json"`，否则 415。
-
-## 注意
-
-- 端口被占用时桥接以退出码 73 退出，`/health` 打不开就是没起来
-- `models-catalog.json` 缓存 6 小时，`--refresh` 强刷；catalog 变了桥接会在 5 秒内自动重读（按 mtime）
-- `--reasoning` 默认关：WorkBuddy 开推理会给上游发额外参数，chat 直通路径不保证每家都认
-- 不要把 `go_key.txt` 提交到任何 git 仓库（`.gitignore` 已挡）
-
-## 致谢与来源
-
-| 项目 | 用了什么 |
-|---|---|
-| [wuwu0605/workbuddy-opencode-go-bridge](https://github.com/wuwu0605/workbuddy-opencode-go-bridge)（MIT） | 桥接内核：协议路由、账号池、流式转发。本仓库在其基础上加了四协议转换、图形面板、代理分流、官方用量同步、托盘打包 |
-| [Duskriver/dsh-opencode-go](https://github.com/Duskriver/dsh-opencode-go)（MIT） | 只读了实现思路：models.dev 作为模型元数据权威源、`/v1/usage` 额度接口、控制台用量口径 |
-| [models.dev](https://models.dev/api.json) | 模型上下文/价格/思考档位的数据源 |
-
-上游版权声明保留在 [LICENSE](LICENSE)。如果你只想要一个最小桥接，直接用上游项目即可；这个仓库多出来的是面板、协议覆盖面和分发形态。
-
-## 参与
-
-- 跑测试：`npm test`（44 项，零依赖，`node --test`）
-- 改完先 `node --check ui.js && node --check src/bridge.js`
-- 出包：`python pack\build.py --version x.y.z`，产物 `dist\OpenCodeGoConsole.exe`
-- 提交前确认 `git status` 里没有 `accounts.json` / `go_key.txt` / `models-catalog.json`（已被 `.gitignore` 挡住，别用 `-f` 强加）
+[MIT](LICENSE) · 只在本机运行，不收集、不上传任何数据。

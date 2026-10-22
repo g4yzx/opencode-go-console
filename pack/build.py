@@ -39,6 +39,8 @@ APP_FILES = [
     'accounts.js',
     'package.json',
     'README.md',
+    'README.en.md',
+    'LICENSE',
     'ui/index.html',
     'src/bridge.js',
     'src/protocol-converter.js',
