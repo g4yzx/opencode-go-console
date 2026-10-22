@@ -1,5 +1,6 @@
 # opencode GO 控制台 · 桥接 + 托盘面板
 
+[![tests](https://github.com/g4yzx/opencode-go-console/actions/workflows/test.yml/badge.svg)](https://github.com/g4yzx/opencode-go-console/actions/workflows/test.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 把 **opencode Go** 订阅接进 **WorkBuddy**：本地四协议桥接（chat / Responses / Anthropic / Google 互转）+ 可视化控制台 + 单文件 Windows 托盘版。
