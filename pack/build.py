@@ -14,6 +14,9 @@
     zlib 压完约 30 MB，单文件分发够用。
   * 归档格式故意做得极简（OCA1），C 侧解析只有几十行，出错概率低。
   * 版本号写进 exe 资源与 app/.version，版本变化才重新解包，用户数据原地保留。
+  * 链接必须 `-static`：否则 MinGW 会挑 zlib1.dll 等动态库，换台机器就报
+    「找不到 zlib1.dll」。改完用 `objdump -p dist/*.exe | grep "DLL Name"`
+    确认只剩 KERNEL32/USER32/SHELL32/ADVAPI32/WS2_32/msvcrt。
 """
 
 import argparse
@@ -174,7 +177,12 @@ def main():
                     '-i', 'launcher.rc', '-o', 'launcher_res.o'],
                    cwd=BUILD, check=True, env=env)
     out = Path(args.out).resolve()
+    # -static matters: without it the linker picks zlib1.dll (and possibly
+    # libgcc/libwinpthread DLLs) from the MinGW tree, and the exe only starts on
+    # machines that happen to have them on PATH. Everything but the Windows
+    # system DLLs must be baked in.
     subprocess.run([str(gcc), '-O2', '-s', '-municode', '-mwindows',
+                    '-static', '-static-libgcc',
                     '-DUNICODE', '-D_UNICODE',
                     '-I', str(BUILD),
                     str(PACK / 'launcher.c'), 'launcher_res.o',

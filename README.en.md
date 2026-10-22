@@ -7,7 +7,7 @@
 
 - GitHub: <https://github.com/g4yzx/opencode-go-console> ([Releases](https://github.com/g4yzx/opencode-go-console/releases))
 - Gitee: <https://gitee.com/g4yzx/opencode-go-console> ([Releases](https://gitee.com/g4yzx/opencode-go-console/releases))
-- License MIT ([LICENSE](LICENSE)) · Security audit [AUDIT.md](AUDIT.md) · Version v1.0.2
+- License MIT ([LICENSE](LICENSE)) · Security audit [AUDIT.md](AUDIT.md) · Version v1.0.3
 
 > The console UI and the model names it writes are in Chinese. This document gives the English
 > label followed by the Chinese label you will actually see, e.g. **Accounts & Usage** (`账号与用量`).

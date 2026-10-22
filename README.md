@@ -7,7 +7,7 @@
 
 - GitHub：<https://github.com/g4yzx/opencode-go-console>（[Releases](https://github.com/g4yzx/opencode-go-console/releases)）
 - Gitee：<https://gitee.com/g4yzx/opencode-go-console>（[发行版](https://gitee.com/g4yzx/opencode-go-console/releases)）
-- 协议 MIT（[LICENSE](LICENSE)）· 安全审计 [AUDIT.md](AUDIT.md) · 版本 v1.0.2
+- 协议 MIT（[LICENSE](LICENSE)）· 安全审计 [AUDIT.md](AUDIT.md) · 版本 v1.0.3
 
 ## 软件功能
 
